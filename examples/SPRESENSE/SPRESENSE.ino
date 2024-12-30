@@ -48,7 +48,7 @@ static void print_pos(SpNavData *pNavData) {
   snprintf(StringBuffer, STRING_BUFFER_SIZE, "Date:%04d/%02d/%02d\n", pNavData->time.year, pNavData->time.month, pNavData->time.day);
   print_with_debug(StringBuffer);
 
-  snprintf(StringBuffer, STRING_BUFFER_SIZE, "Time:%02d:%02d:%02d.%06ld\n", pNavData->time.hour, pNavData->time.minute, pNavData->time.sec, pNavData->time.usec);
+  snprintf(StringBuffer, STRING_BUFFER_SIZE, "Time:%02d%02d%02d.%02d\n", pNavData->time.hour, pNavData->time.minute, pNavData->time.sec, pNavData->time.usec);
   print_with_debug(StringBuffer);
 
   // print satellites count
