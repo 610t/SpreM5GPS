@@ -1,7 +1,10 @@
+#include <SD.h>
 #include <M5Unified.h>
 
 bool logger_mode = false;
 bool sd_exist = false;
+
+const static char gps_log_filename[] = "/GPS/gps_log.txt";
 
 void setup() {
   Serial.begin(115200);   // for debug output
@@ -11,8 +14,17 @@ void setup() {
   M5.setLogDisplayIndex(0);
   M5.Display.setTextScroll(true);
   M5.Lcd.setTextSize(2);
+  M5.Log.printf("SpreM5GPSense start!!\n");
 
-  // Initialize SD here
+  // Initialize SD
+  while (!SD.begin(GPIO_NUM_4, SPI, 15000000)) {
+    M5.Log.printf("SD Wait...");
+    delay(500);
+  }
+  sd_exist = true;
+  if (!SD.exists("/GPS")) {
+    SD.mkdir("/GPS");
+  }
 }
 
 void loop() {
@@ -37,10 +49,15 @@ void loop() {
 
     Serial.printf("%s\n", buf);
     M5.Log.printf("%s\n", buf);
-  }
 
-  // Log to SD
-  if (logger_mode && sd_exist) {
-    // Convert to NEMA format
+    // Log to SD
+    if (logger_mode && sd_exist) {
+      //// Get data value from buffer? ////
+
+      // Write out NMEA GGA data to SD
+      File GPSFile = SD.open(gps_log_filename, FILE_APPEND);
+      GPSFile.printf("$GPGGA,....\n");
+      GPSFile.close();
+    }
   }
 }
