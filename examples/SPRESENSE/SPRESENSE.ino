@@ -57,9 +57,9 @@ static void print_pos(SpNavData *pNavData) {
 
   // print position data
   if (pNavData->posFixMode == FixInvalid) {
-    Serial.printf("Fix:No-Fix\n");
+    print_with_debug("Fix:No-Fix\n");
   } else {
-    Serial.printf("Fix:Fix\n");
+    print_with_debug("Fix:Fix\n");
   }
   if (pNavData->posDataExist == 0) {
     Serial.print("Post:No Position\n");
