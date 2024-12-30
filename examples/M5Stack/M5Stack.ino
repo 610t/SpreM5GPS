@@ -97,19 +97,18 @@ void loop() {
   if (data_update) {
     if (logger_mode && sd_exist) {
       // Write out NMEA GGA data to SD
-      //if (lat > 0.0 && lon > 0.0) {
-
+      if (fix_state) {
 #define STRING_BUFFER_SIZE 1024
-      char StringBuffer[STRING_BUFFER_SIZE];
+        char StringBuffer[STRING_BUFFER_SIZE];
 
-      snprintf(StringBuffer, STRING_BUFFER_SIZE, "$GPGGA,%s,%f,N,%f,E,4,%d,0,0,M,1.0,0*76\n", time.c_str(), lat, lon, numSat);
-      M5.Log.printf(StringBuffer);
+        snprintf(StringBuffer, STRING_BUFFER_SIZE, "$GPGGA,%s,%f,N,%f,E,4,%d,0,0,M,1.0,0*76\n", time.c_str(), lat, lon, numSat);
+        M5.Log.printf(StringBuffer);
 
-      // Output to SD
-      File GPSFile = SD.open(gps_log_filename, FILE_APPEND);
-      GPSFile.printf(StringBuffer);
-      GPSFile.close();
-      //}
+        // Output to SD
+        File GPSFile = SD.open(gps_log_filename, FILE_APPEND);
+        GPSFile.printf(StringBuffer);
+        GPSFile.close();
+      }
     }
     M5.Log.printf("---\n");  // Print separater
     data_update = false;
