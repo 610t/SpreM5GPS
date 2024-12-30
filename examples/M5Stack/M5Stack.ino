@@ -4,6 +4,8 @@
 bool logger_mode = false;
 bool sd_exist = false;
 
+bool data_update = false;  // Is data updated?
+
 const static char gps_log_filename[] = "/GPS/gps_log.txt";
 
 void setup() {
@@ -27,9 +29,22 @@ void setup() {
   }
 }
 
-void loop() {
-  char buf[1024] = { 0 };
+String getStrValue(String data, String pattern) {
+  data.replace(pattern.c_str(), "");
+  return (data);
+}
 
+float getFloatValue(String data, String pattern) {
+  data.replace(pattern.c_str(), "");
+  return (data.toFloat());
+}
+
+int getIntValue(String data, String pattern) {
+  data.replace(pattern.c_str(), "");
+  return (data.toInt());
+}
+
+void loop() {
   M5.update();
 
   // logger mode on/off
@@ -43,21 +58,60 @@ void loop() {
     M5.Log.printf("* Logger mode off.\n");
   }
 
+  // GPS data
+  String date, time;
+  int numSat;
+  float lat, lon;
+  bool fix_state;
+
   int av = Serial2.available();
-  if (av > 0) {
-    Serial2.readBytes(buf, av);
+  while (av > 0) {
+    String line = Serial2.readStringUntil('\n');
+    av = Serial2.available();
 
-    Serial.printf("%s\n", buf);
-    M5.Log.printf("%s\n", buf);
+    M5.Log.printf("%s\n", line.c_str());
 
-    // Log to SD
-    if (logger_mode && sd_exist) {
-      //// Get data value from buffer? ////
-
-      // Write out NMEA GGA data to SD
-      File GPSFile = SD.open(gps_log_filename, FILE_APPEND);
-      GPSFile.printf("$GPGGA,....\n");
-      GPSFile.close();
+    // Convert to NMEA GGA format
+    if (line.startsWith("Date:")) {
+      date = getStrValue(line, "Date:");
+    } else if (line.startsWith("Time:")) {
+      time = getStrValue(line, "Time:");
+    } else if (line.startsWith("numSat:")) {
+      numSat = getIntValue(line, "numSat:");
+    } else if (line.startsWith("Lat:")) {
+      lat = getFloatValue(line, "Lat:");
+    } else if (line.startsWith("Lon:")) {
+      lon = getFloatValue(line, "Lon:");
+    } else if (line.startsWith("Fix:")) {
+      String fix = getStrValue(line, "Fix:");
+      if (fix.startsWith("Fix")) {
+        fix_state = true;
+      } else {
+        fix_state = false;
+      }
     }
+    data_update = true;
+  }
+
+  // Log to SD
+  if (data_update) {
+    if (logger_mode && sd_exist) {
+      // Write out NMEA GGA data to SD
+      //if (lat > 0.0 && lon > 0.0) {
+
+#define STRING_BUFFER_SIZE 1024
+      char StringBuffer[STRING_BUFFER_SIZE];
+
+      snprintf(StringBuffer, STRING_BUFFER_SIZE, "$GPGGA,%s,%f,N,%f,E,4,%d,0,0,M,1.0,0*76\n", time.c_str(), lat, lon, numSat);
+      M5.Log.printf(StringBuffer);
+
+      // Output to SD
+      File GPSFile = SD.open(gps_log_filename, FILE_APPEND);
+      GPSFile.printf(StringBuffer);
+      GPSFile.close();
+      //}
+    }
+    M5.Log.printf("---\n");  // Print separater
+    data_update = false;
   }
 }
