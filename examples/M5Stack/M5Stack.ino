@@ -65,6 +65,10 @@ void loop() {
   bool fix_state;
 
   int av = Serial2.available();
+  if (av) {
+    M5.Lcd.clear();
+    M5.Lcd.setCursor(0, 0);
+  }
   while (av > 0) {
     String line = Serial2.readStringUntil('\n');
     av = Serial2.available();
@@ -110,7 +114,6 @@ void loop() {
         GPSFile.close();
       }
     }
-    M5.Log.printf("---\n");  // Print separater
     data_update = false;
   }
 }
