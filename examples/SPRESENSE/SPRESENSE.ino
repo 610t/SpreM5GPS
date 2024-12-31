@@ -48,11 +48,22 @@ static void print_pos(SpNavData *pNavData) {
   snprintf(StringBuffer, STRING_BUFFER_SIZE, "Date:%04d/%02d/%02d\n", pNavData->time.year, pNavData->time.month, pNavData->time.day);
   print_with_debug(StringBuffer);
 
-  snprintf(StringBuffer, STRING_BUFFER_SIZE, "Time:%02d%02d%02d.%02d\n", pNavData->time.hour, pNavData->time.minute, pNavData->time.sec, pNavData->time.usec);
+  snprintf(StringBuffer, STRING_BUFFER_SIZE, "Time:%02d%02d%02d.%02d\n", pNavData->time.hour, pNavData->time.minute, pNavData->time.sec, int(pNavData->time.usec / 10000));
   print_with_debug(StringBuffer);
 
   // print satellites count
   snprintf(StringBuffer, STRING_BUFFER_SIZE, "numSat:%2d\n", pNavData->numSatellites);
+  print_with_debug(StringBuffer);
+
+  snprintf(StringBuffer, STRING_BUFFER_SIZE, "numSatCalc:%2d\n", pNavData->numSatellitesCalcPos);
+  print_with_debug(StringBuffer);
+
+  // HDOP
+  snprintf(StringBuffer, STRING_BUFFER_SIZE, "HDOP:%.1f\n", pNavData->hdop);
+  print_with_debug(StringBuffer);
+
+  // altitude
+  snprintf(StringBuffer, STRING_BUFFER_SIZE, "alt:%.1f\n", pNavData->altitude);
   print_with_debug(StringBuffer);
 
   // print position data
