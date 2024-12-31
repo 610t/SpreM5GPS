@@ -1,3 +1,27 @@
+/*
+  Function CoordinateToString() and the logic of caluclating GPGGA checksum is based on gnss_nmea.cpp.
+  See license below.
+ */
+
+/*
+ *  gnss_nmea.cpp - NMEA's GGA sentence
+ *  Copyright 2017 Sony Semiconductor Solutions Corporation
+ *
+ *  This library is free software; you can redistribute it and/or
+ *  modify it under the terms of the GNU Lesser General Public
+ *  License as published by the Free Software Foundation; either
+ *  version 2.1 of the License, or (at your option) any later version.
+ *
+ *  This library is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *  Lesser General Public License for more details.
+ *
+ *  You should have received a copy of the GNU Lesser General Public
+ *  License along with this library; if not, write to the Free Software
+ *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+
 #include <SD.h>
 #include <M5Unified.h>
 
@@ -6,7 +30,49 @@ bool sd_exist = false;
 
 bool data_update = false;  // Is data updated?
 
-const static char gps_log_filename[] = "/GPS/gps_log.txt";
+const static char gps_log_filename[] = "/GPS/gps_log.nmea";
+
+#define CORIDNATE_TYPE_LATITUDE 0  /**< Coordinate type latitude */
+#define CORIDNATE_TYPE_LONGITUDE 1 /**< Coordinate type longitude */
+
+static void CoordinateToString(char *pBuffer, int length, double Coordinate,
+                               unsigned int cordinate_type) {
+  double tmp;
+  int Degree;
+  int Minute;
+  int Minute2;
+  char direction;
+  unsigned char fixeddig;
+
+  const static struct {
+    unsigned char fixeddigit;
+    char dir[2];
+  } CordInfo[] = {
+    { .fixeddigit = 2, .dir = { 'N', 'S' } },
+    { .fixeddigit = 3, .dir = { 'E', 'W' } },
+  };
+
+  if (cordinate_type > CORIDNATE_TYPE_LONGITUDE) {
+    snprintf(pBuffer, length, ",,");
+    return;
+  }
+
+  if (Coordinate >= 0.0) {
+    tmp = Coordinate;
+    direction = CordInfo[cordinate_type].dir[0];
+  } else {
+    tmp = -Coordinate;
+    direction = CordInfo[cordinate_type].dir[1];
+  }
+  fixeddig = CordInfo[cordinate_type].fixeddigit;
+  Degree = (int)tmp;
+  tmp = (tmp - (double)Degree) * 60 + 0.00005;
+  Minute = (int)tmp;
+  tmp = (tmp - (double)Minute) * 10000;
+  Minute2 = (int)tmp;
+
+  snprintf(pBuffer, length, "%0*d%02d.%07d,%c", fixeddig, Degree, Minute, Minute2, direction);
+}
 
 void setup() {
   Serial.begin(115200);   // for debug output
@@ -60,8 +126,10 @@ void loop() {
 
   // GPS data
   String date, time;
-  int numSat;
+  int numSat, numSatCalc;
   float lat, lon;
+  float hdop;
+  float alt;
   bool fix_state;
 
   int av = Serial2.available();
@@ -82,10 +150,16 @@ void loop() {
       time = getStrValue(line, "Time:");
     } else if (line.startsWith("numSat:")) {
       numSat = getIntValue(line, "numSat:");
+    } else if (line.startsWith("numSatCalc:")) {
+      numSatCalc = getIntValue(line, "numSatCalc:");
     } else if (line.startsWith("Lat:")) {
       lat = getFloatValue(line, "Lat:");
     } else if (line.startsWith("Lon:")) {
       lon = getFloatValue(line, "Lon:");
+    } else if (line.startsWith("alt:")) {
+      alt = getFloatValue(line, "alt:");
+    } else if (line.startsWith("HDOP:")) {
+      hdop = getFloatValue(line, "HDOP:");
     } else if (line.startsWith("Fix:")) {
       String fix = getStrValue(line, "Fix:");
       if (fix.startsWith("Fix")) {
@@ -104,13 +178,34 @@ void loop() {
       if (fix_state) {
 #define STRING_BUFFER_SIZE 1024
         char StringBuffer[STRING_BUFFER_SIZE];
+        char latStr[STRING_BUFFER_SIZE];
+        char lonStr[STRING_BUFFER_SIZE];
 
-        snprintf(StringBuffer, STRING_BUFFER_SIZE, "$GPGGA,%s,%f,N,%f,E,4,%d,0,0,M,1.0,0*76\n", time.c_str(), lat, lon, numSat);
-        M5.Log.printf(StringBuffer);
+        CoordinateToString(latStr, STRING_BUFFER_SIZE, lat, CORIDNATE_TYPE_LATITUDE);
+        CoordinateToString(lonStr, STRING_BUFFER_SIZE, lon, CORIDNATE_TYPE_LONGITUDE);
+
+        snprintf(StringBuffer, STRING_BUFFER_SIZE, "$GPGGA,%s,%s,%s,1,%02d,%.1f,%.1f,M,34.05,M,1.0,512*", time.c_str(), latStr, lonStr, numSatCalc, hdop, alt);
+        String gga = StringBuffer;
+
+        // Calculate checksum: based on gnss_nmea.cpp.
+        unsigned short CheckSum = 0;
+        {
+          int cnt;
+          const char *pStrDest = gga.c_str();
+
+          /* Calculate checksum as xor of characters. */
+          for (cnt = 1; pStrDest[cnt] != 0x00; cnt++) {
+            CheckSum = CheckSum ^ pStrDest[cnt];
+          }
+        }
+        snprintf(StringBuffer, STRING_BUFFER_SIZE, "%02X\r\n", CheckSum);
+        gga += StringBuffer;
+
+        M5.Log.printf(gga.c_str());
 
         // Output to SD
         File GPSFile = SD.open(gps_log_filename, FILE_APPEND);
-        GPSFile.printf(StringBuffer);
+        GPSFile.printf(gga.c_str());
         GPSFile.close();
       }
     }
