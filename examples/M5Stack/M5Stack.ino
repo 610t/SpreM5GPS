@@ -84,14 +84,28 @@ void setup() {
   M5.Lcd.setTextSize(2);
   M5.Log.printf("SpreM5GPSense start!!\n");
 
+#define MAX_SD_WAIT 5
   // Initialize SD
-  while (!SD.begin(GPIO_NUM_4, SPI, 15000000)) {
-    M5.Log.printf("SD Wait...");
+  //   If SD can't find MAX_SD_WAIT, run viewer only mode.
+  int i;
+  for (i = 0; i < MAX_SD_WAIT; i++) {
+    if (SD.begin(GPIO_NUM_4, SPI, 15000000)) {
+      break;
+    }
+    M5.Log.printf("SD Wait...\n");
     delay(500);
   }
-  sd_exist = true;
-  if (!SD.exists("/GPS")) {
-    SD.mkdir("/GPS");
+
+  if (i != MAX_SD_WAIT) {
+    M5.Log.printf("* Found SD\n");
+    sd_exist = true;
+    if (!SD.exists("/GPS")) {
+      SD.mkdir("/GPS");
+    }
+  } else {
+    M5.Log.printf("* Run viewer only mode\n");
+    Serial2.read();  // Discard all incoming data.
+    sd_exist = false;
   }
 }
 
@@ -173,6 +187,7 @@ void loop() {
 
   // Log to SD
   if (data_update) {
+    data_update = false;
     if (logger_mode && sd_exist) {
       // Write out NMEA GGA data to SD
       if (fix_state) {
@@ -209,6 +224,5 @@ void loop() {
         GPSFile.close();
       }
     }
-    data_update = false;
   }
 }
