@@ -25,12 +25,20 @@
 #include <SD.h>
 #include <M5Unified.h>
 
-bool logger_mode = false;
+#define STRING_BUFFER_SIZE 1024
+#define LOGGER_MODE_MAX 2
+bool logger_enable = false;
+int logger_mode = 0;  // 0:CSV, 1:NEMA
 bool sd_exist = false;
+
+enum logger_mode_enum {
+  logger_mode_csv,
+  logger_mode_nmea,
+};
 
 bool data_update = false;  // Is data updated?
 
-const static char gps_log_filename[] = "/GPS/gps_log.nmea";
+char gps_log_filename[STRING_BUFFER_SIZE] = "/GPS/gps_log.csv";
 
 #define CORIDNATE_TYPE_LATITUDE 0  /**< Coordinate type latitude */
 #define CORIDNATE_TYPE_LONGITUDE 1 /**< Coordinate type longitude */
@@ -128,14 +136,29 @@ void loop() {
   M5.update();
 
   // logger mode on/off
-  if (M5.BtnA.wasClicked() && logger_mode == false) {
-    logger_mode = true;
+  if (M5.BtnA.wasClicked() && logger_enable == false) {
+    logger_enable = true;
     M5.Power.setLed(255);
     M5.Log.printf("* Logger mode on.\n");
-  } else if (M5.BtnB.wasClicked() && logger_mode == true) {
-    logger_mode = false;
+  } else if (M5.BtnB.wasClicked() && logger_enable == true) {
+    logger_enable = false;
     M5.Power.setLed(0);
     M5.Log.printf("* Logger mode off.\n");
+  } else if (M5.BtnC.wasClicked()) {
+    logger_mode++;
+    if (logger_mode >= LOGGER_MODE_MAX) {
+      logger_mode = 0;
+    }
+    switch (logger_mode) {
+      case logger_mode_csv:
+        snprintf(gps_log_filename, STRING_BUFFER_SIZE, "/GPS/gps_log.csv");
+        break;
+      case logger_mode_nmea:
+        snprintf(gps_log_filename, STRING_BUFFER_SIZE, "/GPS/gps_log.nema");
+        break;
+      default:
+        break;
+    }
   }
 
   // GPS data
@@ -188,40 +211,73 @@ void loop() {
   // Log to SD
   if (data_update) {
     data_update = false;
-    if (logger_mode && sd_exist) {
-      // Write out NMEA GGA data to SD
+    if (logger_enable && sd_exist) {
+      // Write GPS data to SD
       if (fix_state) {
-#define STRING_BUFFER_SIZE 1024
         char StringBuffer[STRING_BUFFER_SIZE];
-        char latStr[STRING_BUFFER_SIZE];
-        char lonStr[STRING_BUFFER_SIZE];
+        String gps_str;
 
-        CoordinateToString(latStr, STRING_BUFFER_SIZE, lat, CORIDNATE_TYPE_LATITUDE);
-        CoordinateToString(lonStr, STRING_BUFFER_SIZE, lon, CORIDNATE_TYPE_LONGITUDE);
 
-        snprintf(StringBuffer, STRING_BUFFER_SIZE, "$GPGGA,%s,%s,%s,1,%02d,%.1f,%.1f,M,34.05,M,1.0,512*", time.c_str(), latStr, lonStr, numSatCalc, hdop, alt);
-        String gga = StringBuffer;
+        switch (logger_mode) {
+          case logger_mode_csv:
+            {
+              // Time
+              int hh = (time.substring(0, 1)).toInt();
+              int mm = (time.substring(2, 3)).toInt();
+              int ss = (time.substring(4, 5)).toInt();
+              int ms = (time.substring(7, 8)).toInt();
 
-        // Calculate checksum: based on gnss_nmea.cpp.
-        unsigned short CheckSum = 0;
-        {
-          int cnt;
-          const char *pStrDest = gga.c_str();
+              snprintf(StringBuffer, STRING_BUFFER_SIZE, "%s,%02d:%02d:%02d.%02d,%f,n,%f,e,%f,%d,%f\n", date, hh, mm, ss, ms, lat, lon, alt, numSatCalc, hdop);
+              gps_str = StringBuffer;
+            }
+            break;
+          case logger_mode_nmea:
+            {
+              char latStr[STRING_BUFFER_SIZE];
+              char lonStr[STRING_BUFFER_SIZE];
 
-          /* Calculate checksum as xor of characters. */
-          for (cnt = 1; pStrDest[cnt] != 0x00; cnt++) {
-            CheckSum = CheckSum ^ pStrDest[cnt];
-          }
+              CoordinateToString(latStr, STRING_BUFFER_SIZE, lat, CORIDNATE_TYPE_LATITUDE);
+              CoordinateToString(lonStr, STRING_BUFFER_SIZE, lon, CORIDNATE_TYPE_LONGITUDE);
+
+              snprintf(StringBuffer, STRING_BUFFER_SIZE, "$GPGGA,%s,%s,%s,1,%02d,%.1f,%.1f,M,34.05,M,1.0,512*", time.c_str(), latStr, lonStr, numSatCalc, hdop, alt);
+              gps_str = StringBuffer;
+
+              // Calculate checksum: based on gnss_nmea.cpp.
+              unsigned short CheckSum = 0;
+              {
+                int cnt;
+                const char *pStrDest = gps_str.c_str();
+
+                /* Calculate checksum as xor of characters. */
+                for (cnt = 1; pStrDest[cnt] != 0x00; cnt++) {
+                  CheckSum = CheckSum ^ pStrDest[cnt];
+                }
+              }
+              snprintf(StringBuffer, STRING_BUFFER_SIZE, "%02X\r\n", CheckSum);
+              gps_str += StringBuffer;
+            }
+            break;
+          default:
+            break;
         }
-        snprintf(StringBuffer, STRING_BUFFER_SIZE, "%02X\r\n", CheckSum);
-        gga += StringBuffer;
-
-        M5.Log.printf(gga.c_str());
 
         // Output to SD
         File GPSFile = SD.open(gps_log_filename, FILE_APPEND);
-        GPSFile.printf(gga.c_str());
+        GPSFile.printf(gps_str.c_str());
         GPSFile.close();
+
+        // Display at M5Stack
+        M5.Log.printf(gps_str.c_str());
+        switch (logger_mode) {
+          case logger_mode_csv:
+            M5.Log.printf("Mode:CSV\n");
+            break;
+          case logger_mode_nmea:
+            M5.Log.printf("Mode:NMEA\n");
+            break;
+          default:
+            break;
+        }
       }
     }
   }
