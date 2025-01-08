@@ -1,4 +1,6 @@
 # SpreM5GPSense
+![System image](image/SpreM5GPSense_System.svg)
+
 GPS viewer and logger using [SPRESENSE](https://developer.sony.com/ja/spresense) and [M5Stack](https://m5stack.com/).
 - [Program for SPRESENSE](examples/SPRESENSE/)
 - Program for M5Stack
