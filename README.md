@@ -5,7 +5,7 @@ GPS viewer and logger using [SPRESENSE](https://developer.sony.com/ja/spresense)
   - [GPS viewer](examples/M5Stack_viewer/)
   - [GPS logger](examples/M5Stack/)
 
-See more detail at [SpreM5GPSense: SPRESENSEとM5Stackで作るGPSシステム](https://elchika.com/article/822e2b64-3f4a-4bbf-b4d6-03f1a059b858/).
+See more detail at [SpreM5GPSense: SPRESENSEとM5Stackで作るGPSシステム](https://elchika.com/article/822e2b64-3f4a-4bbf-b4d6-03f1a059b858/) in Japanese..
 
 ---
 [Takeshi MUTOH](https://scrapbox.io/610t/610t) (X:[610t](https://x.com/610t))
